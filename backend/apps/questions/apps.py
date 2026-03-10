@@ -2,4 +2,6 @@ from django.apps import AppConfig
 
 
 class QuestionsConfig(AppConfig):
-    name = "questions"
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'apps.questions'
+    verbose_name = '题库管理'

@@ -1,0 +1,79 @@
+services:
+  judge0-server:
+    image: judge0/judge0:1.13.1
+    ports:
+      - "2358:2358"
+    privileged: true
+    environment:
+      - RAILS_ENV=production
+      - RAILS_MAX_THREADS=4
+      - SECRET_KEY_BASE=your_secret_key_base_change_me
+      - POSTGRES_HOST=judge0-db
+      - POSTGRES_DB=judge0
+      - POSTGRES_USER=judge0
+      - POSTGRES_PASSWORD=judge0password
+      - REDIS_HOST=judge0-redis
+      - REDIS_PORT=6379
+      - ENABLE_WAIT_RESULT=true
+      - ENABLE_BATCHED_SUBMISSIONS=true
+    volumes:
+      - type: tmpfs
+        target: /box
+    tmpfs:
+      - /var/local/lib/isolate:exec
+    depends_on:
+      judge0-db:
+        condition: service_healthy
+      judge0-redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  judge0-worker:
+    image: judge0/judge0:1.13.1
+    command: bash -c "while ! curl -s http://judge0-server:2358/system_info > /dev/null 2>&1; do sleep 2; done && ./scripts/workers"
+    privileged: true
+    environment:
+      - RAILS_ENV=production
+      - RAILS_MAX_THREADS=4
+      - SECRET_KEY_BASE=your_secret_key_base_change_me
+      - POSTGRES_HOST=judge0-db
+      - POSTGRES_DB=judge0
+      - POSTGRES_USER=judge0
+      - POSTGRES_PASSWORD=judge0password
+      - REDIS_HOST=judge0-redis
+      - REDIS_PORT=6379
+    volumes:
+      - type: tmpfs
+        target: /box
+    tmpfs:
+      - /var/local/lib/isolate:exec
+    depends_on:
+      - judge0-server
+    restart: unless-stopped
+
+  judge0-db:
+    image: postgres:13
+    environment:
+      - POSTGRES_DB=judge0
+      - POSTGRES_USER=judge0
+      - POSTGRES_PASSWORD=judge0password
+    volumes:
+      - judge0-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U judge0"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  judge0-redis:
+    image: redis:7
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  judge0-db-data:

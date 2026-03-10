@@ -2,4 +2,6 @@ from django.apps import AppConfig
 
 
 class CommentsConfig(AppConfig):
-    name = "comments"
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'apps.comments'
+    verbose_name = '评论系统'
