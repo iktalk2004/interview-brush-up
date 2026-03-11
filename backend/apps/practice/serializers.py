@@ -13,11 +13,12 @@ class SubmitTextAnswerSerializer(serializers.Serializer):
 class SubmissionRecordSerializer(serializers.ModelSerializer):
     """答题记录序列化器"""
     question_title = serializers.CharField(source='question.title', read_only=True)
+    question_type = serializers.CharField(source='question.question_type', read_only=True)
 
     class Meta:
         model = SubmissionRecord
         fields = [
-            'id', 'question_id', 'question_title', 'user_answer',
+            'id', 'question_id', 'question_title', 'question_type', 'user_answer',
             'score', 'is_correct', 'scoring_method', 'language',
             'time_spent', 'ai_feedback', 'created_at'
         ]

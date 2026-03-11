@@ -11,6 +11,7 @@ class SubmitCodeSerializer(serializers.Serializer):
 
 class JudgeTaskSerializer(serializers.ModelSerializer):
     question_title = serializers.CharField(source='question.title', read_only=True)
+    status = serializers.CharField(source='get_status_display', read_only=True)
 
     class Meta:
         model = JudgeTask

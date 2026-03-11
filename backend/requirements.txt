@@ -1,0 +1,13 @@
+Django>=4.2
+djangorestframework
+djangorestframework-simplejwt
+django-cors-headers
+django-filter
+django-celery-beat
+python-dotenv
+Pillow
+celery
+numpy
+scipy
+scikit-learn
+requests

@@ -136,6 +136,19 @@ class UserProfileView(APIView):
             return error_response(message=serializer.errors)
 
         serializer.save()
+
+        # 修改资料（特别是兴趣）后，清除当天的推荐记录，以便重新生成
+        try:
+            from apps.recommend.models import DailyRecommendation
+            from django.utils import timezone
+            DailyRecommendation.objects.filter(
+                user=request.user, 
+                date=timezone.now().date(),
+                is_completed=False  # 仅清除未完成的
+            ).delete()
+        except Exception:
+            pass
+
         user_info = UserInfoSerializer(request.user).data
         return success_response(data=user_info, message='修改成功')
 
@@ -185,7 +198,7 @@ class AdminUserListView(APIView):
         page_size = int(request.query_params.get('page_size', 20))
         search = request.query_params.get('search', '')
 
-        queryset = User.objects.all().order_by('-date_joined')
+        queryset = User.objects.all().order_by('id')
         if search:
             queryset = queryset.filter(
                 models.Q(username__icontains=search) | models.Q(email__icontains=search)

@@ -4,6 +4,49 @@ from datetime import timedelta
 
 from apps.practice.models import UserQuestionStatus, SubmissionRecord
 from apps.questions.models import Category
+from .models import QuestionStat
+
+
+def update_question_stat(question_id):
+    """更新单个题目的统计数据"""
+    submissions = SubmissionRecord.objects.filter(question_id=question_id)
+    
+    if not submissions.exists():
+        QuestionStat.objects.update_or_create(
+            question_id=question_id,
+            defaults={
+                'submission_count': 0,
+                'success_count': 0,
+                'average_score': 0.0,
+                'pass_rate': 0.0,
+            }
+        )
+        return
+    
+    submission_count = submissions.count()
+    success_count = submissions.filter(is_correct=True).count()
+    avg_result = submissions.aggregate(avg=Avg('score'))
+    average_score = round(avg_result['avg'] or 0, 2)
+    pass_rate = round(success_count / submission_count * 100, 2) if submission_count > 0 else 0.0
+    
+    QuestionStat.objects.update_or_create(
+        question_id=question_id,
+        defaults={
+            'submission_count': submission_count,
+            'success_count': success_count,
+            'average_score': average_score,
+            'pass_rate': pass_rate,
+        }
+    )
+
+
+def update_all_question_stats():
+    """批量更新所有题目的统计数据"""
+    from apps.questions.models import Question
+    
+    questions = Question.objects.all()
+    for question in questions:
+        update_question_stat(question.id)
 
 
 def get_user_dashboard(user):

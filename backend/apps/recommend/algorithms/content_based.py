@@ -47,12 +47,35 @@ class ContentBasedRecommender(BaseRecommender):
             id__in=user_question_ids | exclude_ids
         ).values('id', 'category_id', 'sub_category_id', 'difficulty')
 
+        # 尝试获取题目统计数据以增加热度权重
+        from apps.stats.models import QuestionStat
+        from apps.users.models import UserInterest
+        from apps.questions.models import Category
+
+        stats = dict(QuestionStat.objects.values_list('question_id', 'submission_count'))
+        max_submissions = max(stats.values()) if stats else 1
+
+        # 获取用户感兴趣的分类ID
+        interest_names = list(UserInterest.objects.filter(user=user).values_list('category_name', flat=True))
+        interest_cat_ids = set()
+        if interest_names:
+            interest_cat_ids = set(Category.objects.filter(name__in=interest_names).values_list('id', flat=True))
+
         predictions = []
         for q in candidates:
             score = 0
             score += cat_weight.get(q['category_id'], 0) * 0.5
             score += sub_cat_weight.get(q['sub_category_id'], 0) * 0.3
             score += diff_weight.get(q['difficulty'], 0) * 0.2
+            
+            # 增加一点热度权重 (0.1 max)
+            popularity = stats.get(q['id'], 0) / max_submissions
+            score += popularity * 0.1
+            
+            # 增加用户显式兴趣权重 (重要优化：即使有做题记录，也要考虑用户当前的兴趣设置)
+            if q['category_id'] in interest_cat_ids:
+                score += 0.3  # 给予显著加权
+
             if score > 0:
                 predictions.append((q['id'], round(score, 4)))
 
@@ -69,7 +92,12 @@ class ContentBasedRecommender(BaseRecommender):
             # 没有兴趣也没有记录，推荐热门简单题
             questions = Question.objects.filter(difficulty='easy').exclude(
                 id__in=exclude_ids
-            ).order_by('?')[:n]
+            ).select_related('stat').order_by('-stat__submission_count')[:n]
+            # 如果没有统计数据，退化为随机
+            if not questions:
+                 questions = Question.objects.filter(difficulty='easy').exclude(
+                    id__in=exclude_ids
+                ).order_by('?')[:n]
             return [(q.id, 1.0) for q in questions]
 
         from apps.questions.models import Category
@@ -79,6 +107,11 @@ class ContentBasedRecommender(BaseRecommender):
 
         questions = Question.objects.filter(category_id__in=cat_ids).exclude(
             id__in=exclude_ids
-        ).order_by('?')[:n]
+        ).select_related('stat').order_by('-stat__submission_count')[:n]
+        
+        if not questions:
+             questions = Question.objects.filter(category_id__in=cat_ids).exclude(
+                id__in=exclude_ids
+            ).order_by('?')[:n]
 
         return [(q.id, 1.0) for q in questions]

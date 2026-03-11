@@ -57,8 +57,8 @@ def import_questions_from_excel(file):
             elif question.question_type == 'code':
                 import json
                 description = str(row[5]).strip() if len(row) > 5 and row[5] else ''
-                test_cases_raw = str(row[6]).strip() if len(row) > 6 and row[6] else '[]'
-                reference_code = str(row[7]).strip() if len(row) > 7 and row[7] else ''
+                reference_code = str(row[6]).strip() if len(row) > 6 and row[6] else '[]'
+                test_cases_raw = str(row[7]).strip() if len(row) > 7 and row[7] else ''
                 try:
                     test_cases = json.loads(test_cases_raw)
                 except json.JSONDecodeError:

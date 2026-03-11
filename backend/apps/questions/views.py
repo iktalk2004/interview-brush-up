@@ -33,6 +33,8 @@ class QuestionListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        from apps.practice.models import UserQuestionStatus
+
         queryset = Question.objects.select_related('category', 'sub_category').all()
 
         # 筛选
@@ -56,7 +58,7 @@ class QuestionListView(APIView):
             )
 
         # 排序
-        ordering = request.query_params.get('ordering', '-created_at')
+        ordering = request.query_params.get('ordering', 'id')
         queryset = queryset.order_by(ordering)
 
         # 分页
@@ -66,8 +68,19 @@ class QuestionListView(APIView):
         page_obj = paginator.get_page(page)
 
         serializer = QuestionListSerializer(page_obj.object_list, many=True)
+        question_ids = [q.id for q in page_obj.object_list]
+        status_map = dict(
+            UserQuestionStatus.objects.filter(
+                user=request.user, question_id__in=question_ids
+            ).values_list('question_id', 'best_score')
+        )
+        results = serializer.data
+        for item in results:
+            item['is_done'] = item['id'] in status_map
+            item['best_score'] = status_map.get(item['id'])
+
         return success_response(data={
-            'results': serializer.data,
+            'results': results,
             'count': paginator.count,
             'page': page,
             'page_size': page_size,
@@ -204,6 +217,10 @@ class AdminQuestionListView(APIView):
             queryset = queryset.filter(difficulty=difficulty)
         if question_type:
             queryset = queryset.filter(question_type=question_type)
+
+        # 排序：默认按 ID 升序
+        ordering = request.query_params.get('ordering', 'id')
+        queryset = queryset.order_by(ordering)
 
         page = int(request.query_params.get('page', 1))
         page_size = int(request.query_params.get('page_size', 20))

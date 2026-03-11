@@ -135,9 +135,22 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),  # 认证头类型
 }
 
-# Celery 配置
-CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/1')
+# Django 缓存框架配置（使用 Redis）
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': os.getenv('REDIS_CACHE_URL', 'redis://localhost:6379/2'),
+        'TIMEOUT': 300,
+        'OPTIONS': {
+            'MAX_ENTRIES': 10000,  # 最大缓存条目数
+            'CULL_FREQUENCY': 3,  # 达到上限时清理 1/3
+        }
+    }
+}
+
+# Celery 配置（异步任务系统）
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')  # 消息队列，用于传递任务消息
+CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/1')  # 存储任务执行结果
 CELERY_ACCEPT_CONTENT = ['json']  # 接受的内容类型
 CELERY_TASK_SERIALIZER = 'json'  # 任务序列化器
 CELERY_RESULT_SERIALIZER = 'json'  # 结果序列化器

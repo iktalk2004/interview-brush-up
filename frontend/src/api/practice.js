@@ -8,6 +8,10 @@ export function getQuestionHistory(questionId) {
   return request.get(`/practice/history/${questionId}`)
 }
 
+export function getPracticeHistory(params) {
+  return request.get('/practice/history', { params })
+}
+
 export function getMistakes(params) {
   return request.get('/practice/mistakes', { params })
 }

@@ -104,8 +104,23 @@
             <span class="meta-dot" v-if="item.category && item.sub_category">·</span>
             <span class="meta-item" v-if="item.sub_category">{{ item.sub_category.name }}</span>
           </div>
+          <div class="card-stats" v-if="item.stat">
+            <span class="stat-item">
+              <span class="stat-label">提交</span>
+              <span class="stat-value">{{ item.stat.submission_count || 0 }}</span>
+            </span>
+            <span class="stat-item">
+              <span class="stat-label">通过率</span>
+              <span class="stat-value">{{ (item.stat.pass_rate || 0).toFixed(1) }}%</span>
+            </span>
+            <span class="stat-item">
+              <span class="stat-label">平均分</span>
+              <span class="stat-value">{{ (item.stat.average_score || 0).toFixed(1) }}</span>
+            </span>
+          </div>
         </div>
         <div class="card-right">
+          <span v-if="item.is_done" class="done-tag">已完成</span>
           <span class="type-tag">{{ item.question_type === 'text' ? '简答题' : '代码题' }}</span>
           <span class="diff-tag" :class="item.difficulty">
             {{ difficultyLabel(item.difficulty) }}
@@ -331,6 +346,29 @@ onMounted(() => {
   color: var(--text-placeholder);
 }
 
+.card-stats {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin-top: 6px;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.stat-label {
+  color: var(--text-tertiary);
+}
+
+.stat-value {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
 .card-right {
   display: flex;
   align-items: center;
@@ -345,6 +383,15 @@ onMounted(() => {
   background: var(--color-info-bg);
   padding: 2px 10px;
   border-radius: var(--radius-sm);
+}
+
+.done-tag {
+  font-size: 12px;
+  color: var(--color-easy);
+  background: var(--color-easy-bg);
+  padding: 2px 10px;
+  border-radius: var(--radius-sm);
+  font-weight: 500;
 }
 
 .diff-tag {

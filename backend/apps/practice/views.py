@@ -83,6 +83,35 @@ class QuestionHistoryView(APIView):
         return success_response(data=serializer.data)
 
 
+class PracticeHistoryView(APIView):
+    """获取用户的所有练习记录"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        records = SubmissionRecord.objects.filter(
+            user=request.user
+        ).select_related('question').order_by('-created_at')
+
+        # 筛选
+        is_correct = request.query_params.get('is_correct')
+        if is_correct is not None:
+            # 前端传字符串 'true'/'false'，这里要转布尔值
+            records = records.filter(is_correct=is_correct.lower() == 'true')
+
+        page = int(request.query_params.get('page', 1))
+        page_size = int(request.query_params.get('page_size', 20))
+        paginator = Paginator(records, page_size)
+        page_obj = paginator.get_page(page)
+
+        serializer = SubmissionRecordSerializer(page_obj.object_list, many=True)
+        return success_response(data={
+            'results': serializer.data,
+            'count': paginator.count,
+            'page': page,
+            'total_pages': paginator.num_pages,
+        })
+
+
 class MistakeListView(APIView):
     """错题本列表"""
     permission_classes = [IsAuthenticated]

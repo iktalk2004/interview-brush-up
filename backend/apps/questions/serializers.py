@@ -53,10 +53,27 @@ class QuestionListSerializer(serializers.ModelSerializer):
     """题目列表序列化器"""
     category = CategorySimpleSerializer(read_only=True)
     sub_category = SubCategorySimpleSerializer(read_only=True)
+    stat = serializers.SerializerMethodField()
 
     class Meta:
         model = Question
-        fields = ['id', 'question_type', 'title', 'category', 'sub_category', 'difficulty', 'created_at']
+        fields = ['id', 'question_type', 'title', 'category', 'sub_category', 'difficulty', 'created_at', 'stat']
+
+    def get_stat(self, obj):
+        from apps.stats.models import QuestionStat
+        try:
+            stat = QuestionStat.objects.get(question=obj)
+            return {
+                'submission_count': stat.submission_count,
+                'pass_rate': stat.pass_rate,
+                'average_score': stat.average_score,
+            }
+        except QuestionStat.DoesNotExist:
+            return {
+                'submission_count': 0,
+                'pass_rate': 0.0,
+                'average_score': 0.0,
+            }
 
 
 class QuestionDetailSerializer(serializers.ModelSerializer):
@@ -65,14 +82,33 @@ class QuestionDetailSerializer(serializers.ModelSerializer):
     sub_category = SubCategorySimpleSerializer(read_only=True)
     text_detail = TextQuestionDetailSerializer(read_only=True)
     code_detail = CodeQuestionDetailSerializer(read_only=True)
+    stat = serializers.SerializerMethodField()
 
     class Meta:
         model = Question
         fields = [
             'id', 'question_type', 'title', 'category', 'sub_category',
             'difficulty', 'created_at', 'updated_at',
-            'text_detail', 'code_detail',
+            'text_detail', 'code_detail', 'stat',
         ]
+
+    def get_stat(self, obj):
+        from apps.stats.models import QuestionStat
+        try:
+            stat = QuestionStat.objects.get(question=obj)
+            return {
+                'submission_count': stat.submission_count,
+                'success_count': stat.success_count,
+                'pass_rate': stat.pass_rate,
+                'average_score': stat.average_score,
+            }
+        except QuestionStat.DoesNotExist:
+            return {
+                'submission_count': 0,
+                'success_count': 0,
+                'pass_rate': 0.0,
+                'average_score': 0.0,
+            }
 
 
 # ============================================================

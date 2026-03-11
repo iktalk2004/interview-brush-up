@@ -26,3 +26,24 @@ class PageVisitLog(models.Model):
         ordering = ['-created_at']
         verbose_name = '页面停留记录'
         verbose_name_plural = verbose_name
+
+class QuestionStat(models.Model):
+    """题目统计数据"""
+    question = models.OneToOneField(
+        'questions.Question',
+        on_delete=models.CASCADE,
+        related_name='stat',
+        verbose_name='题目'
+    )
+    submission_count = models.IntegerField(default=0, verbose_name='提交次数')
+    success_count = models.IntegerField(default=0, verbose_name='通过次数')
+    average_score = models.FloatField(default=0.0, verbose_name='平均分')
+    pass_rate = models.FloatField(default=0.0, verbose_name='通过率')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
+
+    class Meta:
+        db_table = 'question_stats'
+        ordering = ['-updated_at']
+        verbose_name = '题目统计数据'
+        verbose_name_plural = verbose_name
+   

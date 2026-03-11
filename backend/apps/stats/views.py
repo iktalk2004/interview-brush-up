@@ -3,8 +3,8 @@ from rest_framework.permissions import IsAuthenticated
 
 from common.response import success_response, error_response
 from apps.users.permissions import IsAdmin
-from .models import PageVisitLog
-from .services import get_user_dashboard, get_ranking_list
+from .models import PageVisitLog, QuestionStat
+from .services import get_user_dashboard, get_ranking_list, update_question_stat, update_all_question_stats
 
 
 class DashboardView(APIView):
@@ -143,3 +143,41 @@ class AdminStatsOverviewView(APIView):
         data['user_trend'] = user_trend
 
         return success_response(data=data)
+
+
+class QuestionStatView(APIView):
+    """获取题目统计数据"""
+    permission_classes = []
+
+    def get(self, request):
+        question_id = request.query_params.get('question_id')
+        if not question_id:
+            return error_response(message='缺少question_id参数')
+        
+        try:
+            stat = QuestionStat.objects.get(question_id=question_id)
+            from .serializers import QuestionStatSerializer
+            serializer = QuestionStatSerializer(stat)
+            return success_response(data=serializer.data)
+        except QuestionStat.DoesNotExist:
+            return success_response(data={
+                'submission_count': 0,
+                'success_count': 0,
+                'average_score': 0.0,
+                'pass_rate': 0.0,
+            })
+
+
+class BatchUpdateQuestionStatsView(APIView):
+    """批量更新题目统计数据（管理员）"""
+    permission_classes = [IsAdmin]
+
+    def post(self, request):
+        question_id = request.data.get('question_id')
+        
+        if question_id:
+            update_question_stat(question_id)
+            return success_response(message='题目统计更新成功')
+        else:
+            update_all_question_stats()
+            return success_response(message='全部题目统计更新成功')

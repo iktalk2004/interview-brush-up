@@ -7,6 +7,7 @@
           <template #prefix><el-icon><Search /></el-icon></template>
         </el-input>
         <button class="btn-secondary btn-sm" @click="$router.push('/admin/categories')">管理分类</button>
+        <button class="btn-secondary btn-sm" @click="showImportDialog">批量导入</button>
         <button class="btn-primary btn-sm" @click="openCreate">新增题目</button>
       </div>
     </div>
@@ -35,7 +36,10 @@
           <tr v-for="item in list" :key="item.id">
             <td>{{ item.id }}</td>
             <td class="title-cell">{{ item.title }}</td>
-            <td>{{ item.category?.name || '-' }}</td>
+            <td>
+              {{ item.category?.name || '-' }}
+              <span v-if="item.sub_category" style="color: var(--text-tertiary); margin-left: 4px;">/ {{ item.sub_category.name }}</span>
+            </td>
             <td>{{ item.question_type === 'text' ? '简答题' : '代码题' }}</td>
             <td><span class="diff-tag" :class="item.difficulty">{{ diffLabel(item.difficulty) }}</span></td>
             <td>{{ formatDateTime(item.created_at) }}</td>
@@ -54,12 +58,37 @@
     </div>
 
     <!-- 查看详情弹窗 -->
-    <el-dialog v-model="detailVisible" title="题目详情" width="700px">
+    <el-dialog v-model="detailVisible" title="题目详情" width="750px">
       <div v-if="detailData" class="detail-content">
         <div class="detail-row"><span class="detail-label">标题</span><span>{{ detailData.title }}</span></div>
         <div class="detail-row"><span class="detail-label">类型</span><span>{{ detailData.question_type === 'text' ? '简答题' : '代码题' }}</span></div>
         <div class="detail-row"><span class="detail-label">分类</span><span>{{ detailData.category?.name }} {{ detailData.sub_category ? '/ ' + detailData.sub_category.name : '' }}</span></div>
         <div class="detail-row"><span class="detail-label">难度</span><span class="diff-tag" :class="detailData.difficulty">{{ diffLabel(detailData.difficulty) }}</span></div>
+        
+        <!-- 统计数据区块 -->
+        <div class="detail-section">
+          <div class="section-title">题目统计</div>
+          <div class="stats-grid" v-if="detailData.stat">
+            <div class="stat-card">
+              <div class="stat-value">{{ detailData.stat.submission_count || 0 }}</div>
+              <div class="stat-label">总提交次数</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">{{ detailData.stat.success_count || 0 }}</div>
+              <div class="stat-label">通过次数</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">{{ (detailData.stat.pass_rate || 0).toFixed(1) }}%</div>
+              <div class="stat-label">通过率</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">{{ (detailData.stat.average_score || 0).toFixed(1) }}</div>
+              <div class="stat-label">平均分</div>
+            </div>
+          </div>
+          <div v-else class="stats-empty">暂无统计数据</div>
+        </div>
+        
         <template v-if="detailData.question_type === 'text' && detailData.text_detail">
           <div class="detail-row" v-if="detailData.text_detail.content"><span class="detail-label">题干</span><span class="detail-text">{{ detailData.text_detail.content }}</span></div>
           <div class="detail-row"><span class="detail-label">标准答案</span><span class="detail-text">{{ detailData.text_detail.standard_answer }}</span></div>
@@ -158,6 +187,33 @@
         </button>
       </template>
     </el-dialog>
+    <el-dialog v-model="importVisible" title="批量导入题目" width="500px">
+      <el-form label-position="top">
+        <el-alert
+            title="导入说明"
+            type="info"
+            :closable="false"
+            style="margin-bottom: 16px"
+        >
+          <p>请上传 Excel 文件（.xlsx 或 .xls 格式）</p>
+          <p>文件第一行应为表头，从第二行开始为题目数据</p>
+          <p>必填字段：标题、题型、分类、难度</p>
+        </el-alert>
+        <el-form-item label="选择文件">
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            @change="e => importFile = e.target.files[0]" style="width: 100%"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <button class="btn-secondary" @click="importVisible = false">取消</button>
+        <button class="btn-primary" :disabled="importing" @click="handleImport" style="margin-left: 12px">
+          {{ importing ? '导入中...' : '开始导入' }}
+        </button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -165,7 +221,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import {
   getAdminQuestions, getAdminQuestionDetail, createQuestion, updateQuestion,
-  deleteQuestion, getAdminCategories,
+  deleteQuestion, getAdminCategories, importQuestions,
 } from '@/api/admin'
 import { DIFFICULTY_OPTIONS, QUESTION_TYPE_OPTIONS } from '@/utils/constants'
 import { formatDateTime } from '@/utils/format'
@@ -179,6 +235,11 @@ const page = ref(1)
 const pageSize = 20
 const total = ref(0)
 const filters = reactive({ category: null, difficulty: null, question_type: null })
+
+// 批量导入弹窗
+const importVisible = ref(false)
+const importFile = ref(null)
+const importing = ref(false)
 
 // 详情弹窗
 const detailVisible = ref(false)
@@ -247,6 +308,30 @@ function resetForm() {
 function openCreate() {
   resetForm()
   formVisible.value = true
+}
+
+function showImportDialog(){
+  importFile.value = null
+  importVisible.value = true
+}
+
+async function handleImport(){
+  if(!importFile.value) {
+    ElMessage.warning('请选择Excel文件')
+    return
+  }
+
+  importing.value = true
+  try{
+    const res = await importQuestions(importFile.value)
+    ElMessage.success(`导入完成：成功 ${res.data.success} 条，失败 ${res.data.failed} 条`)
+    importVisible.value = false
+    fetchList()
+  } catch (e) {
+    // 错误已在拦截器处理
+  } finally {
+    importing.value = false
+  }
 }
 
 async function openDetail(id) {
@@ -390,6 +475,17 @@ onMounted(() => { fetchCategories(); fetchList() })
 .detail-row { display: flex; gap: var(--spacing-md); }
 .detail-label { min-width: 80px; font-size: 13px; color: var(--text-tertiary); flex-shrink: 0; padding-top: 2px; }
 .detail-text { font-size: 14px; color: var(--text-secondary); line-height: 1.6; white-space: pre-wrap; word-break: break-all; }
+
+.detail-section { margin-top: var(--spacing-md); padding-top: var(--spacing-md); border-top: 1px solid var(--border-light); }
+.section-title { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: var(--spacing-md); }
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--spacing-md); }
+.stat-card {
+  background: var(--bg-floating); border: 1px solid var(--border-default);
+  border-radius: var(--radius-md); padding: var(--spacing-md); text-align: center;
+}
+.stat-card .stat-value { font-size: 24px; font-weight: 600; color: var(--text-primary); }
+.stat-card .stat-label { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.stats-empty { text-align: center; color: var(--text-tertiary); padding: var(--spacing-md); }
 
 /* 表单 */
 .form-inline { display: flex; gap: var(--spacing-md); }
